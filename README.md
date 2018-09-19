@@ -1,2 +1,3 @@
-# Ignite-CloudEvents
-This is a repository for demo-ing purpose.
+# Ignite CloudEvents Demo Repository #
+
+This is a sample repository for demo-ing purpose.
