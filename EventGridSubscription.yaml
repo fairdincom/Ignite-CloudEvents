@@ -1,0 +1,82 @@
+$schema: https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#
+contentVersion: 1.0.0.0
+parameters:
+  location:
+    type: string
+    metadata:
+      description: The region where resources are deployed
+    defaultValue: '[resourceGroup().location]'
+  eventGridTopicName:
+    type: string
+    metadata:
+      description: Name of Custom Event Grid Topic
+  eventGridSubscriptionName:
+    type: string
+    metadata:
+      description: Name of Event Grid Subscription
+  eventGridSubscriptionDeliverySchema:
+    type: string
+    metadata:
+      description: Event Grid Subscription delivery schema
+    allowedValues:
+    - EventGridSchema
+    - CloudEventV01Schema
+    defaultValue: CloudEventV01Schema
+  eventGridSubscriptionEndpointType:
+    type: string
+    metadata:
+      description: Event Grid Subscription endpoint type
+    allowedValues:
+    - Webhook
+    defaultValue: Webhook
+  eventGridSubscriptionIncludedEventTypes:
+    type: string
+    metadata:
+      description: Comma delimited list of filters for Event Grid Subscription
+    defaultValue: All
+  logicAppName:
+    type: string
+    metadata:
+      description: Name of Logic App used for Event Grid Subscription endpoint
+variables:
+  logicApp:
+    name: "[parameters('logicAppName')]"
+    resourceId: "[resourceId('Microsoft.Logic/workflows', parameters('logicAppName'))]"
+    apiVersion: "[providers('Microsoft.Logic', 'workflows').apiVersions[0]]"
+    triggerId: "[resourceId('Microsoft.Logic/workflows/triggers', parameters('logicAppName'), 'manual')]"
+  eventGridTopic:
+    name: "[parameters('eventGridTopicName')]"
+    resourceId: "[resourceId('Microsoft.EventGrid/topics', parameters('eventGridTopicName'))]"
+  eventGridSubscription:
+    name: "[parameters('eventGridSubscriptionName')]"
+    apiVersion: "[providers('Microsoft.EventGrid', 'eventSubscriptions').apiVersions[0]]"
+    location: "[parameters('location')]"
+    deliverySchema: "[parameters('eventGridSubscriptionDeliverySchema')]"
+    endpointType: "[parameters('eventGridSubscriptionEndpointType')]"
+    filters:
+      includedEventTypes: "[split(parameters('eventGridSubscriptionIncludedEventTypes'), ',')]"
+  tags:
+    author: Justin Yoo
+    profile: https://twitter.com/justinchronicle
+    projectUrl: https://github.com/fairdincom/Ignite-CloudEvents-Demo
+    repositoryUrl: https://github.com/fairdincom/Ignite-CloudEvents-Demo
+    license: https://raw.githubusercontent.com/fairdincom/Ignite-CloudEvents-Demo/master/LICENSE
+resources:
+- comments: "### RESOURCE - EVENT GRID SUBSCRIPTION ###"
+  apiVersion: "[variables('eventGridSubscription').apiVersion]"
+  type: Microsoft.EventGrid/topics/providers/eventSubscriptions
+  name: "[concat(variables('eventGridTopic').name, '/Microsoft.EventGrid/', variables('eventGridSubscription').name)]"
+  location: "[variables('eventGridSubscription').location]"
+  tags: "[variables('tags')]"
+  properties:
+    eventDeliverySchema: "[variables('eventGridSubscription').deliverySchema]"
+    destination:
+      endpointType: "[variables('eventGridSubscription').endpointType]"
+      properties:
+        endpointUrl: "[listCallbackUrl(variables('logicApp').triggerId, variables('logicApp').apiVersion).value]"
+    filter:
+      includedEventTypes: "[variables('eventGridSubscription').filters.includedEventTypes]"
+outputs:
+  subscription:
+    type: object
+    value: "[reference(variables('eventGridSubscription').name)]"

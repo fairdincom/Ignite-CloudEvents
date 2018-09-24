@@ -1,0 +1,96 @@
+$schema: https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#
+contentVersion: 1.0.0.0
+parameters:
+  location:
+    type: string
+    metadata:
+      description: The region where resources are deployed
+    defaultValue: '[resourceGroup().location]'
+  logicAppName:
+    type: string
+    metadata:
+      description: Name of Logic App
+  eventGridTopicName:
+    type: string
+    metadata:
+      description: Name of Custom Event Grid Topic
+  eventGridTopicEndpointUrl:
+    type: string
+    metadata:
+      description: Custom Event Grid Topic endpoint URL
+variables:
+  logicApp:
+    name: "[parameters('logicAppName')]"
+    apiVersion: "[providers('Microsoft.Logic', 'workflows').apiVersions[0]]"
+    location: "[parameters('location')]"
+  eventGridTopic:
+    name: "[parameters('eventGridTopicName')]"
+    resourceId: "[resourceId('Microsoft.EventGrid/topics', parameters('eventGridTopicName'))]"
+    apiVersion: "[providers('Microsoft.EventGrid', 'topics').apiVersions[0]]"
+    location: "[parameters('location')]"
+    endpointUrl: "[parameters('eventGridTopicEndpointUrl')]"
+  tags:
+    author: Justin Yoo
+    profile: https://twitter.com/justinchronicle
+    projectUrl: https://github.com/fairdincom/Ignite-CloudEvents-Demo
+    repositoryUrl: https://github.com/fairdincom/Ignite-CloudEvents-Demo
+    license: https://raw.githubusercontent.com/fairdincom/Ignite-CloudEvents-Demo/master/LICENSE
+resources:
+- comments: '### RESOURCE - LOGIC APP ###'
+  apiVersion: "[variables('logicApp').apiVersion]"
+  type: Microsoft.Logic/workflows
+  name: "[variables('logicApp').name]"
+  location: "[variables('logicApp').location]"
+  tags: "[variables('tags')]"
+  properties:
+    state: Enabled
+    definition:
+      $schema: https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#
+      contentVersion: 1.0.0.0
+      parameters:
+        eventGridTopic:
+          type: object
+          defaultValue:
+            resourceId: "[variables('eventGridTopic').resourceId]"
+            endpointUrl: "[variables('eventGridTopic').endpointUrl]"
+            accessKey: "[listKeys(resourceId('Microsoft.EventGrid/topics', variables('eventGridTopic').name), variables('eventGridTopic').apiVersion).key1]"
+      triggers:
+        manual:
+          type: Request
+          kind: Http
+          inputs:
+            method: "POST"
+            schema: {}
+      actions:
+        TransformPayload:
+          type: Compose
+          runAfter: {}
+          inputs:
+            eventType: "@{concat('com.github.fairdincom.Ignite-CloudEvents-Demo.Comments.oncomment', triggerBody()['action'])}"
+            eventTypeVersion: "1.0"
+            cloudEventsVersion: "0.1"
+            eventID: "@{concat(triggerBody()['comment']['id'], '|', triggerBody()['comment']['updated_at'])}"
+            eventTime: "@{triggerBody()['comment']['updated_at']}"
+            source: "@{concat(parameters('eventGridTopic')['resourceId'], '#oncomment', triggerBody()['action'])}"
+            contentType: "@{triggerOutputs()['headers']['Content-Type']}"
+            data: "@triggerBody()"
+        SendWebhookToEventGridTopic:
+          type: Http
+          runAfter:
+            TransformPayload:
+            - Succeeded
+          inputs:
+            method: "POST"
+            uri: "@parameters('eventGridTopic')['endpointUrl']"
+            headers:
+              AEG-SAS-KEY: "@parameters('eventGridTopic')['accessKey']"
+              CE-EVENTTYPE: "@{outputs('TransformPayload')['eventType']}"
+              CE-EVENTTYPEVERSION: "@{outputs('TransformPayload')['eventTypeVersion']}"
+              CE-CLOUDEVENTSVERSION: "@{outputs('TransformPayload')['cloudEventsVersion']}"
+              CE-EVENTID: "@{outputs('TransformPayload')['eventID']}"
+              CE-EVENTTIME: "@{outputs('TransformPayload')['eventTime']}"
+              CE-CONTENTTYPE: "@{outputs('TransformPayload')['contentType']}"
+              CE-SOURCE: "@{outputs('TransformPayload')['source']}"
+            body: "@outputs('TransformPayload')"
+      outputs: {}
+outputs: {}

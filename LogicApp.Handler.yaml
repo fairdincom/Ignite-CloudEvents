@@ -1,0 +1,46 @@
+$schema: https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#
+contentVersion: 1.0.0.0
+parameters:
+  location:
+    type: string
+    metadata:
+      description: The region where resources are deployed
+    defaultValue: '[resourceGroup().location]'
+  logicAppName:
+    type: string
+    metadata:
+      description: Name of Logic App
+variables:
+  logicApp:
+    name: "[parameters('logicAppName')]"
+    apiVersion: "[providers('Microsoft.Logic', 'workflows').apiVersions[0]]"
+    location: "[parameters('location')]"
+  tags:
+    author: Justin Yoo
+    profile: https://twitter.com/justinchronicle
+    projectUrl: https://github.com/fairdincom/Ignite-CloudEvents-Demo
+    repositoryUrl: https://github.com/fairdincom/Ignite-CloudEvents-Demo
+    license: https://raw.githubusercontent.com/fairdincom/Ignite-CloudEvents-Demo/master/LICENSE
+resources:
+- comments: '### RESOURCE - LOGIC APP - EVENT HANDLER ###'
+  apiVersion: "[variables('logicApp').apiVersion]"
+  type: Microsoft.Logic/workflows
+  name: "[variables('logicApp').name]"
+  location: "[variables('logicApp').location]"
+  tags: "[variables('tags')]"
+  properties:
+    state: Enabled
+    definition:
+      $schema: https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#
+      contentVersion: 1.0.0.0
+      parameters: {}
+      triggers:
+        manual:
+          type: Request
+          kind: Http
+          inputs:
+            method: "POST"
+            schema: {}
+      actions: {}
+      outputs: {}
+outputs: {}

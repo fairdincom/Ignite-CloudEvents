@@ -1,0 +1,49 @@
+$schema: https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#
+contentVersion: 1.0.0.0
+parameters:
+  location:
+    type: string
+    metadata:
+      description: The region where resources are deployed
+    defaultValue: '[resourceGroup().location]'
+  eventGridTopicName:
+    type: string
+    metadata:
+      description: Name of Event Grid Topic
+  eventGridTopicSchema:
+    type: string
+    metadata:
+      description: Event Grid Topic schema
+    allowedValues:
+    - EventGridSchema
+    - CloudEventV01Schema
+    defaultValue: CloudEventV01Schema
+variables:
+  eventGridTopic:
+    name: "[parameters('eventGridTopicName')]"
+    resourceId: "[resourceId('Microsoft.EventGrid/topics', parameters('eventGridTopicName'))]"
+    apiVersion: "[providers('Microsoft.EventGrid', 'topics').apiVersions[0]]"
+    location: "[parameters('location')]"
+    schema: "[parameters('eventGridTopicSchema')]"
+  tags:
+    author: Justin Yoo
+    profile: https://twitter.com/justinchronicle
+    projectUrl: https://github.com/fairdincom/Ignite-CloudEvents-Demo
+    repositoryUrl: https://github.com/fairdincom/Ignite-CloudEvents-Demo
+    license: https://raw.githubusercontent.com/fairdincom/Ignite-CloudEvents-Demo/master/LICENSE
+resources:
+- comments: "### RESOURCE - CUSTOM EVENT GRID TOPIC ###"
+  apiVersion: "[variables('eventGridTopic').apiVersion]"
+  type: Microsoft.EventGrid/topics
+  name: "[variables('eventGridTopic').name]"
+  location: "[variables('eventGridTopic').location]"
+  tags: "[variables('tags')]"
+  properties:
+    inputSchema: "[variables('eventGridTopic').schema]"
+outputs:
+  endpoint:
+    type: string
+    value: "[reference(variables('eventGridTopic').name).endpoint]"
+  accessKey:
+    type: string
+    value: "[listKeys(resourceId('Microsoft.EventGrid/topics', variables('eventGridTopic').name), variables('eventGridTopic').apiVersion).key1]"
